@@ -34,17 +34,13 @@ require (
 )
 
 require (
-	github.com/anthonynsimon/bild v0.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.18.25
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.33.1
 	github.com/disintegration/imaging v1.6.2
-	github.com/inconshreveable/mousetrap v1.0.0 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/go-chi/chi v1.5.4
 	github.com/muesli/smartcrop v0.3.0
 	github.com/prometheus/client_golang v1.15.1
 	github.com/rwcarlsen/goexif v0.0.0-20190401172101-9e8deecbddbd
-	github.com/spf13/cobra v0.0.5 // indirect
-	github.com/spf13/pflag v1.0.3 // indirect
-	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
+	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8
 	willnorris.com/go/gifresize v1.0.0
 )
