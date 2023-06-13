@@ -1,2 +1,3 @@
 .vscode/launch.json
-cmd/client/__debug_bin
+cmd/compressfile/__debug_bin
+cmd/compressfile/client
