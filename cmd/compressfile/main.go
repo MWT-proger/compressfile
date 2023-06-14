@@ -21,8 +21,8 @@ func init() {
 // validateConfig() Проверяет обязательные параметры для старта проекта
 // при не соответствии требованиям возвращает ошибку
 func validateConfig() error {
-	ErrBacketNameStorageNotFound := errors.New("Необходимо указать имя корзины s3 хранилища")
-	ErrEndpointURLS3StorageNotFound := errors.New("Необходимо указать URL адрес s3 хранилища")
+	ErrBacketNameStorageNotFound := errors.New("необходимо указать имя корзины s3 хранилища")
+	ErrEndpointURLS3StorageNotFound := errors.New("необходимо указать URL адрес s3 хранилища")
 
 	conf := configs.GetConfig()
 	if conf.BacketNameStorage == "" {
@@ -43,12 +43,18 @@ func main() {
 	if err := validateConfig(); err != nil {
 		log.Fatalln(err)
 	} else {
+		var (
+			s    = &s3storage.Storage{}
+			h, _ = handlers.NewAPIHandler(s)
+			r    = router.Router(h)
+			serv = server.Server{Router: r}
+		)
 
-		h, _ := handlers.NewAPIHandler(&s3storage.Storage{})
-		r := router.Router(h)
-		s := server.Server{Router: r}
+		if err := s.InitClientS3(); err != nil {
+			panic(err)
+		}
 
-		if err := s.Run(); err != nil {
+		if err := serv.Run(); err != nil {
 			panic(err)
 		}
 	}
