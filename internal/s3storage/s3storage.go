@@ -7,10 +7,11 @@ import (
 	"io"
 	"log"
 
-	"github.com/MWT-proger/compressfile/configs"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+
+	"github.com/MWT-proger/compressfile/configs"
 )
 
 type Storage struct {

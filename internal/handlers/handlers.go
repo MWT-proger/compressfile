@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/MWT-proger/compressfile/configs"
 	"github.com/MWT-proger/compressfile/internal/s3storage"
@@ -25,6 +27,12 @@ type imageTransformationData struct {
 	height   string
 }
 
+var AllovedExtension = map[string]int{
+	"png":  1,
+	"jpg":  1,
+	"jpeg": 1,
+}
+
 // getWidthXHeight() Возвращает строку вида WidthXHeight (200x200)
 func (d imageTransformationData) getWidthXHeight() string {
 	return fmt.Sprintf("%sx%s", d.width, d.height)
@@ -32,12 +40,19 @@ func (d imageTransformationData) getWidthXHeight() string {
 
 // checkFileFormat() Проверяет формат файла указанного в pathFile
 func (d imageTransformationData) checkFileFormat() error {
-	// TODO: Проверка на определенные форматы картинок
+	var (
+		splitPathFile = strings.Split(d.pathFile, ".")
+		extension     = splitPathFile[len(splitPathFile)-1]
+	)
+
+	if _, ok := AllovedExtension[extension]; !ok {
+		return errors.New("формат не разрешен")
+	}
 	return nil
 }
 
-// getFromQuery(query url.Values) Устанавливает переменны согласно полученному Query
-func (d *imageTransformationData) getFromQuery(query url.Values) error {
+// setFromQuery(query url.Values) Устанавливает переменны согласно полученному Query
+func (d *imageTransformationData) setFromQuery(query url.Values) error {
 	d.pathFile = query.Get("pathFile")
 	d.width = query.Get("width")
 	d.height = query.Get("height")
@@ -56,7 +71,7 @@ func (h *APIHandler) TransformImage(res http.ResponseWriter, req *http.Request) 
 		basePath = "GoCompress/v1/"
 		td       = imageTransformationData{}
 	)
-	td.getFromQuery(req.URL.Query())
+	td.setFromQuery(req.URL.Query())
 
 	if td.pathFile == "" {
 		http.Error(res, "Bad Request", http.StatusBadRequest)
@@ -67,7 +82,11 @@ func (h *APIHandler) TransformImage(res http.ResponseWriter, req *http.Request) 
 		http.Error(res, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	td.checkFileFormat()
+	err := td.checkFileFormat()
+	if err != nil {
+		http.Error(res, "Bad Request", http.StatusBadRequest)
+		return
+	}
 
 	imgStockByte, err := h.storage.Get(config.BacketNameStorage, td.pathFile)
 
@@ -82,14 +101,11 @@ func (h *APIHandler) TransformImage(res http.ResponseWriter, req *http.Request) 
 
 	opt := transform.ParseOptions(td.getWidthXHeight())
 
-	// TODO: Проверка на существует ли такого формата картинка
-	imgStockByteNewFormat, err := h.storage.Get(config.BacketNameStorage, basePath+td.pathFile)
+	pathFileNewImg := basePath + td.getWidthXHeight() + "/" + td.pathFile
 
-	if err != nil {
-		log.Println(err)
-		http.Error(res, "Bad Request", http.StatusBadRequest)
-		return
-	}
+	// TODO: Проверка на существует ли такого формата картинка
+	imgStockByteNewFormat, _ := h.storage.Get(config.BacketNameStorage, pathFileNewImg)
+
 	if imgStockByteNewFormat != nil {
 		log.Println("Уже существует")
 		res.Write(imgStockByteNewFormat)
@@ -98,7 +114,7 @@ func (h *APIHandler) TransformImage(res http.ResponseWriter, req *http.Request) 
 
 	img, _ := transform.Transform(imgStockByte, opt)
 
-	err = h.storage.Put(img, config.BacketNameStorage, basePath+td.pathFile)
+	err = h.storage.Put(img, config.BacketNameStorage, pathFileNewImg)
 
 	if err != nil {
 		log.Println(err)
