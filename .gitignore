@@ -1,3 +1,4 @@
 .vscode/launch.json
 cmd/compressfile/__debug_bin
 cmd/compressfile/client
+deployments/.env

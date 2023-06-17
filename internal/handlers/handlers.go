@@ -1,10 +1,17 @@
 package handlers
 
 import (
+	baseErrors "errors"
+	"fmt"
+	"log"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/MWT-proger/compressfile/configs"
+	"github.com/MWT-proger/compressfile/internal/errors"
 	"github.com/MWT-proger/compressfile/internal/s3storage"
+	"github.com/MWT-proger/compressfile/internal/transform"
 )
 
 type APIHandler struct {
@@ -15,35 +22,103 @@ func NewAPIHandler(s s3storage.OperationStorager) (h *APIHandler, err error) {
 	return &APIHandler{s}, err
 }
 
+type imageTransformationData struct {
+	pathFile string
+	width    string
+	height   string
+}
+
+// getWidthXHeight() Возвращает строку вида WidthXHeight (200x200)
+func (d imageTransformationData) getWidthXHeight() string {
+	return fmt.Sprintf("%sx%s", d.width, d.height)
+}
+
+// checkFileFormat() Проверяет формат файла указанного в pathFile
+func (d imageTransformationData) checkFileFormat() error {
+	var (
+		splitPathFile = strings.Split(d.pathFile, ".")
+		extension     = splitPathFile[len(splitPathFile)-1]
+	)
+
+	if _, ok := configs.GetConfig().AllovedExtension[extension]; !ok {
+		return &errors.ErrorFileExtensionNotAllowed{}
+	}
+	return nil
+}
+
+// setFromQuery(query url.Values) Устанавливает переменны согласно полученному Query
+func (d *imageTransformationData) setFromQuery(query url.Values) error {
+	d.pathFile = query.Get("pathFile")
+	d.width = query.Get("width")
+	d.height = query.Get("height")
+
+	return nil
+}
+
 // TransformImage() Плучает картинку по указанному пути
+// Пример "collections/c547ffa8-9d26-4141-a54d-f2f4ae4d8153/28d1d5ec-ddc2-4edb-8adf-37e75031e109/tokens/cfad535a28a84b198811d225a61f566a.png"
 // трансформирует изображение
 // и сохраняет обратно в хранилище добавляя в путь файла параметры трансформации
 func (h *APIHandler) TransformImage(res http.ResponseWriter, req *http.Request) {
-	// testKey := "collections/c547ffa8-9d26-4141-a54d-f2f4ae4d8153/28d1d5ec-ddc2-4edb-8adf-37e75031e109/tokens/cfad535a28a84b198811d225a61f566a.png"
-	config := configs.GetConfig()
 
 	var (
-		pathFile = req.URL.Query().Get("pathFile")
-		width    = req.URL.Query().Get("width")
-		height   = req.URL.Query().Get("height")
+		config   = configs.GetConfig()
+		basePath = "GoCompress/v1/"
+		td       = imageTransformationData{}
 	)
+	td.setFromQuery(req.URL.Query())
 
-	if pathFile == "" {
+	if td.pathFile == "" {
 		http.Error(res, "Bad Request", http.StatusBadRequest)
 		return
 	}
 
-	if width == "" && height == "" {
+	if td.width == "" && td.height == "" {
 		http.Error(res, "Bad Request", http.StatusBadRequest)
 		return
 	}
-
-	file, err := h.storage.UploadFileToServer(config.BacketNameStorage, pathFile)
-
+	err := td.checkFileFormat()
 	if err != nil {
 		http.Error(res, "Bad Request", http.StatusBadRequest)
 		return
 	}
-	res.Write(file)
+
+	imgStockByte, err := h.storage.Get(config.BucketNameStorage, td.pathFile)
+
+	if err != nil {
+
+		if baseErrors.Is(err, &errors.ErrorNoSuchKeyInS3Storage{}) {
+			http.Error(res, "Bad Request", http.StatusBadRequest)
+		}
+		log.Println(err)
+
+		http.Error(res, "", http.StatusInternalServerError)
+		return
+	}
+	log.Println("Стоковое изображение получено")
+
+	opt := transform.ParseOptions(td.getWidthXHeight())
+
+	pathFileNewImg := basePath + td.getWidthXHeight() + "/" + td.pathFile
+
+	// TODO: Проверка на существует ли такого формата картинка
+	imgStockByteNewFormat, _ := h.storage.Get(config.BucketNameStorage, pathFileNewImg)
+
+	if imgStockByteNewFormat != nil {
+		log.Println("Уже существует")
+		res.Write(imgStockByteNewFormat)
+		return
+	}
+
+	img, _ := transform.Transform(imgStockByte, opt)
+
+	err = h.storage.Put(img, config.BucketNameStorage, pathFileNewImg)
+
+	if err != nil {
+		log.Println(err)
+		http.Error(res, "", http.StatusInternalServerError)
+		return
+	}
+	res.Write(img)
 
 }

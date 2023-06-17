@@ -1,10 +1,10 @@
 package main
 
 import (
-	"errors"
 	"log"
 
 	"github.com/MWT-proger/compressfile/configs"
+	custumErrors "github.com/MWT-proger/compressfile/internal/errors"
 	"github.com/MWT-proger/compressfile/internal/handlers"
 	"github.com/MWT-proger/compressfile/internal/router"
 	"github.com/MWT-proger/compressfile/internal/s3storage"
@@ -21,17 +21,15 @@ func init() {
 // validateConfig() Проверяет обязательные параметры для старта проекта
 // при не соответствии требованиям возвращает ошибку
 func validateConfig() error {
-	ErrBacketNameStorageNotFound := errors.New("Необходимо указать имя корзины s3 хранилища")
-	ErrEndpointURLS3StorageNotFound := errors.New("Необходимо указать URL адрес s3 хранилища")
 
 	conf := configs.GetConfig()
-	if conf.BacketNameStorage == "" {
-		err := ErrBacketNameStorageNotFound
+	if conf.BucketNameStorage == "" {
+		err := &custumErrors.ErrorBacketNameS3StorageNotFound{}
 		return err
 	}
 
 	if conf.EndpointURLS3Storage == "" {
-		err := ErrEndpointURLS3StorageNotFound
+		err := &custumErrors.ErrorEndpointURLS3StorageNotFound{}
 		return err
 	}
 	return nil
@@ -44,11 +42,19 @@ func main() {
 		log.Fatalln(err)
 	} else {
 
-		h, _ := handlers.NewAPIHandler(&s3storage.Storage{})
-		r := router.Router(h)
-		s := server.Server{Router: r}
+		var (
+			s    = &s3storage.Storage{}
+			h, _ = handlers.NewAPIHandler(s)
+			r    = router.Router(h)
+			serv = server.Server{Router: r}
+		)
 
-		if err := s.Run(); err != nil {
+		if err := s.InitClientS3(); err != nil {
+			panic(err)
+		}
+		// TODO: проверять на существование корзины
+
+		if err := serv.Run(); err != nil {
 			panic(err)
 		}
 	}
