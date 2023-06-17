@@ -5,13 +5,14 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"log"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/MWT-proger/compressfile/configs"
+	"github.com/MWT-proger/compressfile/internal/errors"
 )
 
 type Storage struct {
@@ -52,11 +53,12 @@ func (s *Storage) Get(bucketName string, objectKey string) ([]byte, error) {
 	})
 
 	if err != nil {
+		if index := strings.Index(err.Error(), "NoSuchKey"); index != -1 {
+			return nil, &errors.ErrorNoSuchKeyInS3Storage{}
+		}
 		return nil, err
+
 	}
-	log.Println("Запрос выполнен")
-	log.Println(result)
-	// НЕобходимо отлавливать 404 ответ
 
 	defer result.Body.Close()
 
@@ -66,7 +68,6 @@ func (s *Storage) Get(bucketName string, objectKey string) ([]byte, error) {
 	}
 
 	return b, err
-
 }
 
 func (s *Storage) Put(img []byte, bucketName string, objectKey string) error {

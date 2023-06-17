@@ -12,7 +12,7 @@ func parseFlags(conf *configs.Config) {
 
 	flag.StringVar(&conf.HostServer, "a", conf.HostServer, "Адрес и порт запуска сервера.")
 
-	flag.StringVar(&conf.BacketNameStorage, "bucket", conf.BacketNameStorage, "Имя корзины в которой лежат файлы.")
+	flag.StringVar(&conf.BucketNameStorage, "bucket", conf.BucketNameStorage, "Имя корзины в которой лежат файлы.")
 
 	flag.Parse()
 }
